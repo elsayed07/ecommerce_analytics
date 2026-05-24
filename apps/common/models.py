@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class TimeStampedModel(models.Model):
@@ -11,7 +12,14 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
-class SoftDeleteManager(models.Manager):
+class SoftDeleteQuerySet(models.QuerySet):
+    """QuerySet whose bulk delete soft-deletes instead of removing rows."""
+
+    def delete(self):
+        return super().update(is_deleted=True, updated_at=timezone.now())
+
+
+class SoftDeleteManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
     """Default manager excluding soft-deleted rows."""
 
     def get_queryset(self):
@@ -32,9 +40,6 @@ class SoftDeleteModel(models.Model):
     def delete(self, using=None, keep_parents=False):
         self.is_deleted = True
         self.save(using=using, update_fields=["is_deleted", "updated_at"])
-
-    def hard_delete(self, using=None, keep_parents=False):
-        super().delete(using=using, keep_parents=keep_parents)
 
     def restore(self):
         self.is_deleted = False

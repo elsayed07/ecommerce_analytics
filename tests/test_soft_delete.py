@@ -18,6 +18,15 @@ def test_soft_delete_hides_from_default_manager():
     assert category.is_deleted is True
 
 
+def test_bulk_delete_is_soft():
+    category = CategoryFactory()
+    Category.objects.filter(pk=category.pk).delete()
+
+    assert not Category.objects.filter(pk=category.pk).exists()
+    row = Category.all_objects.get(pk=category.pk)
+    assert row.is_deleted is True
+
+
 def test_restore_brings_row_back():
     category = CategoryFactory()
     category.delete()
