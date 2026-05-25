@@ -27,6 +27,8 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
+    "django_filters",
+    "drf_spectacular",
 ]
 
 LOCAL_APPS = [
@@ -102,11 +104,38 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_RENDERER_CLASSES": (
+        "apps.common.renderers.EnvelopeJSONRenderer",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "apps.common.pagination.StandardPagination",
+    "PAGE_SIZE": 25,
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ),
+    "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",
+        "user": "1000/day",
+    },
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "E-Commerce Analytics API",
+    "DESCRIPTION": "REST API for the e-commerce analytics dashboard.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
