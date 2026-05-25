@@ -27,6 +27,17 @@ def test_bulk_delete_is_soft():
     assert row.is_deleted is True
 
 
+def test_all_objects_bulk_delete_is_also_soft():
+    category = CategoryFactory()
+    result = Category.all_objects.filter(pk=category.pk).delete()
+
+    # Row is never physically removed, even via all_objects.
+    row = Category.all_objects.get(pk=category.pk)
+    assert row.is_deleted is True
+    # Django-style return shape: (count, {label: count}).
+    assert result == (1, {"products.Category": 1})
+
+
 def test_restore_brings_row_back():
     category = CategoryFactory()
     category.delete()

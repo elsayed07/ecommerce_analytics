@@ -16,7 +16,8 @@ class SoftDeleteQuerySet(models.QuerySet):
     """QuerySet whose bulk delete soft-deletes instead of removing rows."""
 
     def delete(self):
-        return super().update(is_deleted=True, updated_at=timezone.now())
+        count = super().update(is_deleted=True, updated_at=timezone.now())
+        return count, {self.model._meta.label: count}
 
 
 class SoftDeleteManager(models.Manager.from_queryset(SoftDeleteQuerySet)):
@@ -32,7 +33,8 @@ class SoftDeleteModel(models.Model):
     is_deleted = models.BooleanField(default=False)
 
     objects = SoftDeleteManager()
-    all_objects = models.Manager()
+    # Unfiltered (includes soft-deleted rows) but still soft-deletes on bulk delete.
+    all_objects = SoftDeleteQuerySet.as_manager()
 
     class Meta:
         abstract = True
