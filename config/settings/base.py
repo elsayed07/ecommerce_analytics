@@ -1,8 +1,10 @@
 """Shared settings for all environments. Env-driven; never hardcode secrets."""
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -36,6 +38,7 @@ LOCAL_APPS = [
     "apps.users",
     "apps.products",
     "apps.orders",
+    "apps.ingestion",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -139,6 +142,32 @@ SPECTACULAR_SETTINGS = {
 }
 
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# --- Celery ---
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=REDIS_URL)
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_BEAT_SCHEDULE = {
+    "nightly-import": {
+        "task": "tasks.nightly_import.run_nightly_import",
+        "schedule": crontab(hour=2, minute=0),
+    },
+}
+
+# --- Ingestion / ETL ---
+IMPORT_INBOX_DIR = env("IMPORT_INBOX_DIR", default=str(BASE_DIR / "data" / "inbox"))
+MAX_IMPORT_BYTES = 10 * 1024 * 1024
+FX_RATES_TO_EUR = {
+    "EUR": Decimal("1.00"),
+    "USD": Decimal("0.92"),
+    "GBP": Decimal("1.17"),
+    "CHF": Decimal("1.05"),
+}
 
 LOGGING = {
     "version": 1,

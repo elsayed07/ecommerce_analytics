@@ -27,6 +27,18 @@ class IsStaff(_RolePermission):
     role = User.Role.STAFF
 
 
+class IsAdminOrAnalyst(BasePermission):
+    """Only admin/analyst (or superuser) may access; no read-only bypass."""
+
+    allowed_roles = {User.Role.ADMIN, User.Role.ANALYST}
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+        return user.is_superuser or user.role in self.allowed_roles
+
+
 class IsAdminOrAnalystOrReadOnly(BasePermission):
     """Any authenticated user may read; only admin/analyst (or superuser) may write."""
 

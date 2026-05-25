@@ -14,6 +14,10 @@ db.sqlite3
 # Env / secrets
 .env
 
+# Celery
+celerybeat-schedule*
+celerybeat.pid
+
 # Tooling
 .pytest_cache/
 .ruff_cache/

@@ -32,6 +32,8 @@ class Order(BaseModel):
     )
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     currency = models.CharField(max_length=3, default="EUR")
+    source_currency = models.CharField(max_length=3, default="EUR")
+    source_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["-order_date"]
@@ -54,6 +56,7 @@ class OrderItem(BaseModel):
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
 
     class Meta:
+        unique_together = ("order", "product")
         indexes = [
             models.Index(fields=["order"]),
             models.Index(fields=["product"]),

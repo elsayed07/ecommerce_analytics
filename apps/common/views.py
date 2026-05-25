@@ -28,8 +28,23 @@ def _check_redis():
         return "error"
 
 
+def _check_celery():
+    try:
+        from config import celery_app
+
+        replies = celery_app.control.ping(timeout=1)
+        return "ok" if replies else "error"
+    except Exception as exc:
+        logger.warning("Health check: celery unreachable: %s", exc)
+        return "error"
+
+
 def health(request):
-    components = {"database": _check_database(), "redis": _check_redis()}
+    components = {
+        "database": _check_database(),
+        "redis": _check_redis(),
+        "celery": _check_celery(),
+    }
     healthy = all(status == "ok" for status in components.values())
     body = {"status": "ok" if healthy else "error", **components}
     return JsonResponse(body, status=200 if healthy else 503)
