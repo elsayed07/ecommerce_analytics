@@ -78,6 +78,22 @@ def test_wrong_extension_rejected():
     assert res.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_upload_filename_is_sanitised():
+    ProductFactory(sku="SAFE-1")
+    client = auth_client(UserFactory(role=User.Role.ADMIN))
+    upload = SimpleUploadedFile(
+        "../../etc/evil.csv",
+        (HEADER + "S-1,2025-01-15T10:00:00,completed,EUR,s@example.com,S,SAFE-1,1,5.00\n").encode(),
+        content_type="text/csv",
+    )
+
+    res = client.post("/api/v1/imports/", {"file": upload}, format="multipart")
+    assert res.status_code == 202
+    name = res.json()["data"]["source_filename"]
+    assert name == "evil.csv"
+    assert "/" not in name and ".." not in name
+
+
 def test_oversized_upload_rejected(settings):
     settings.MAX_IMPORT_BYTES = 5
     client = auth_client(UserFactory(role=User.Role.ADMIN))

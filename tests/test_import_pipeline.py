@@ -2,6 +2,8 @@ import json
 from decimal import Decimal
 
 import pytest
+from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from apps.ingestion.models import ImportJob
 from apps.orders.models import Customer, Order, OrderItem
@@ -123,3 +125,90 @@ def test_malformed_json_marks_job_failed(tmp_path):
 
     assert job.status == ImportJob.Status.FAILED
     assert job.error_message
+
+
+def test_malformed_sku_is_quarantined(tmp_path):
+    ProductFactory(sku="GOOD")
+    job = _run_csv(
+        tmp_path,
+        "ORD-X,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,bad sku!,1,5.00\n",
+    )
+    assert job.rows_failed == 1
+    assert "malformed SKU" in job.quarantined_rows.first().reason
+
+
+def test_inconsistent_order_header_is_quarantined(tmp_path):
+    ProductFactory(sku="A")
+    ProductFactory(sku="B")
+    job = _run_csv(
+        tmp_path,
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,A,1,5.00\n"
+        "ORD-1,2025-01-15T10:00:00,completed,USD,a@example.com,Alice,B,1,5.00\n",
+    )
+    assert job.rows_failed == 1
+    assert "inconsistent order header" in job.quarantined_rows.first().reason
+    # The first, consistent line still persists.
+    assert Order.objects.get(external_ref="ORD-1").items.count() == 1
+
+
+def test_unexpected_persist_error_marks_job_failed(tmp_path, monkeypatch):
+    ProductFactory(sku="SKU-1")
+
+    def boom(records):
+        raise RuntimeError("db exploded")
+
+    monkeypatch.setattr(import_service, "_persist", boom)
+    job = _run_csv(
+        tmp_path,
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,1,5.00\n",
+    )
+
+    assert job.status == ImportJob.Status.FAILED
+    assert "persist error" in job.error_message
+
+
+def test_scheduled_import_processes_each_file_once(tmp_path, settings):
+    settings.IMPORT_INBOX_DIR = str(tmp_path)
+    ProductFactory(sku="SKU-1")
+    (tmp_path / "orders.csv").write_text(
+        HEADER
+        + "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,1,5.00\n"
+    )
+
+    first = import_service.run_scheduled_import()
+    assert len(first) == 1
+    assert ImportJob.objects.count() == 1
+
+    # Re-scan: the already-completed file is skipped, no duplicate job.
+    second = import_service.run_scheduled_import()
+    assert second == []
+    assert ImportJob.objects.count() == 1
+
+    # A new file produces exactly one new job.
+    (tmp_path / "more.csv").write_text(
+        HEADER
+        + "ORD-2,2025-01-16T10:00:00,completed,EUR,b@example.com,Bob,SKU-1,1,5.00\n"
+    )
+    third = import_service.run_scheduled_import()
+    assert len(third) == 1
+    assert ImportJob.objects.count() == 2
+
+
+def test_management_command_imports_file(tmp_path):
+    ProductFactory(sku="SKU-1")
+    path = tmp_path / "orders.csv"
+    path.write_text(
+        HEADER
+        + "CMD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,2,5.00\n"
+    )
+    call_command("import_orders", file=str(path))
+
+    assert Order.objects.filter(external_ref="CMD-1").exists()
+    assert ImportJob.objects.filter(status=ImportJob.Status.COMPLETED).exists()
+
+
+def test_management_command_rejects_bad_extension(tmp_path):
+    path = tmp_path / "orders.txt"
+    path.write_text("nope")
+    with pytest.raises(CommandError):
+        call_command("import_orders", file=str(path))

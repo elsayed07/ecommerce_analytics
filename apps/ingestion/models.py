@@ -16,6 +16,7 @@ class ImportJob(BaseModel):
         FAILED = "failed", "Failed"
 
     source_filename = models.CharField(max_length=255)
+    source_checksum = models.CharField(max_length=64, blank=True, db_index=True)
     file_format = models.CharField(max_length=8, choices=Format.choices)
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.PENDING
