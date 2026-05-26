@@ -2,6 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from apps.users.models import User
+from services import product_service
 
 from .factories import CategoryFactory, ProductFactory, UserFactory
 
@@ -68,3 +69,49 @@ def test_admin_can_create_product():
     body = res.json()
     assert body["success"] is True
     assert body["data"]["sku"] == "X1"
+
+
+def test_products_filter_by_category():
+    cat_a = CategoryFactory()
+    cat_b = CategoryFactory()
+    ProductFactory(category=cat_a)
+    ProductFactory(category=cat_a)
+    ProductFactory(category=cat_b)
+    client = auth_client(UserFactory())
+
+    res = client.get(f"/api/v1/products/?category={cat_a.id}")
+    assert res.status_code == 200
+    assert res.json()["data"]["count"] == 2
+
+
+def test_category_filter_by_slug():
+    CategoryFactory(slug="keep-me")
+    CategoryFactory(slug="other")
+    client = auth_client(UserFactory())
+
+    res = client.get("/api/v1/categories/?slug=keep-me")
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["count"] == 1
+    assert data["results"][0]["slug"] == "keep-me"
+
+
+def test_product_create_goes_through_service(monkeypatch):
+    category = CategoryFactory()
+    real_create = product_service.create_product
+    calls = {}
+
+    def spy(data):
+        calls["data"] = data
+        return real_create(data)
+
+    monkeypatch.setattr(product_service, "create_product", spy)
+    client = auth_client(UserFactory(role=User.Role.ADMIN))
+    res = client.post(
+        "/api/v1/products/",
+        {"name": "Svc", "sku": "SVC-1", "price": "2.00", "category": category.id},
+        format="json",
+    )
+
+    assert res.status_code == 201
+    assert calls["data"]["sku"] == "SVC-1"

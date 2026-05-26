@@ -3,7 +3,7 @@ from rest_framework.test import APIClient
 
 from apps.users.models import User
 
-from .factories import OrderFactory, OrderItemFactory, UserFactory
+from .factories import CustomerFactory, OrderFactory, OrderItemFactory, UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -45,3 +45,26 @@ def test_customers_are_read_only():
         "/api/v1/customers/", {"name": "x", "email": "x@y.z"}, format="json"
     )
     assert res.status_code == 405
+
+
+def test_orders_filter_by_status_customer_and_currency():
+    target = OrderFactory(status="completed", currency="USD")
+    OrderFactory(status="pending", currency="EUR")
+    client = auth_client(UserFactory())
+
+    assert client.get("/api/v1/orders/?status=completed").json()["data"]["count"] == 1
+    assert client.get("/api/v1/orders/?currency=USD").json()["data"]["count"] == 1
+    by_customer = client.get(f"/api/v1/orders/?customer={target.customer_id}")
+    assert by_customer.json()["data"]["count"] == 1
+
+
+def test_customers_filter_by_email():
+    CustomerFactory(email="match@example.com")
+    CustomerFactory(email="other@example.com")
+    client = auth_client(UserFactory())
+
+    res = client.get("/api/v1/customers/?email=match@example.com")
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["count"] == 1
+    assert data["results"][0]["email"] == "match@example.com"

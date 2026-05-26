@@ -8,6 +8,7 @@ from services import customer_service, order_service
 class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [IsAuthenticated]
+    filterset_fields = ["email"]
     search_fields = ["name", "email"]
     ordering_fields = ["name", "created_at"]
     ordering = ["name"]

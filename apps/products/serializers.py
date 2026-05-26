@@ -1,3 +1,5 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.products.models import Category, Product
@@ -25,6 +27,7 @@ class ProductReadSerializer(serializers.ModelSerializer):
             "inventory_quantity",
         ]
 
+    @extend_schema_field(OpenApiTypes.INT)
     def get_inventory_quantity(self, obj):
         if hasattr(obj, "inventory"):
             return obj.inventory.quantity
