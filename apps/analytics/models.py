@@ -10,6 +10,7 @@ class AnalyticsSnapshot(BaseModel):
         REVENUE_MONTHLY = "revenue_monthly", "Revenue (monthly)"
         TOP_PRODUCTS = "top_products", "Top products"
         CUSTOMERS = "customers", "Customers"
+        FORECAST = "forecast", "Forecast"
 
     snapshot_type = models.CharField(max_length=32, choices=Type.choices)
     period_start = models.DateField()

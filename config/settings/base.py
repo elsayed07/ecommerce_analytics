@@ -182,6 +182,10 @@ FX_RATES_TO_EUR = {
     "CHF": Decimal("1.05"),
 }
 
+# --- Forecasting ---
+FORECAST_HORIZON_DAYS = env.int("FORECAST_HORIZON_DAYS", default=30)
+ANOMALY_Z_THRESHOLD = env.float("ANOMALY_Z_THRESHOLD", default=3.0)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

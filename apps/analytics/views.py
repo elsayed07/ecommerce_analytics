@@ -42,6 +42,14 @@ class CustomersView(APIView):
         return Response(analytics_service.get_customers())
 
 
+class ForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        return Response(analytics_service.get_forecast())
+
+
 @staff_member_required
 def dashboard(request):
     """Server-side Plotly dashboard reading from analytics snapshots (staff only)."""
@@ -81,8 +89,35 @@ def dashboard(request):
     )
     customers_fig.update_layout(title="Customers: new vs returning")
 
+    forecast = analytics_service.get_forecast()
+    forecast_fig = go.Figure()
+    forecast_fig.add_trace(
+        go.Scatter(x=dates, y=[r["revenue"] for r in revenue], name="Actual", mode="lines")
+    )
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=[f["date"] for f in forecast["forecast"]],
+            y=[f["predicted_revenue"] for f in forecast["forecast"]],
+            name="Forecast",
+            mode="lines",
+            line={"dash": "dash"},
+        )
+    )
+    anomalies = forecast.get("anomalies", [])
+    forecast_fig.add_trace(
+        go.Scatter(
+            x=[a["date"] for a in anomalies],
+            y=[a["revenue"] for a in anomalies],
+            name="Anomaly",
+            mode="markers",
+            marker={"color": "red", "size": 10},
+        )
+    )
+    forecast_fig.update_layout(title="Revenue forecast (EUR)")
+
     charts = [
         revenue_fig.to_html(full_html=False, include_plotlyjs="cdn"),
+        forecast_fig.to_html(full_html=False, include_plotlyjs=False),
         products_fig.to_html(full_html=False, include_plotlyjs=False),
         customers_fig.to_html(full_html=False, include_plotlyjs=False),
     ]

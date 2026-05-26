@@ -99,6 +99,7 @@ def test_build_snapshots_is_idempotent_and_clears_cache():
     analytics_service.build_snapshots()
     first_count = AnalyticsSnapshot.objects.count()
     assert first_count > 0
+    assert AnalyticsSnapshot.objects.filter(snapshot_type="forecast").exists()
 
     analytics_service.build_snapshots()
     assert AnalyticsSnapshot.objects.count() == first_count  # upsert, no duplicates

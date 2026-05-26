@@ -5,8 +5,9 @@ management command). The get_* readers serve only from snapshots and are cached 
 the cache is cleared whenever snapshots are rebuilt.
 """
 import logging
-from datetime import date
+from datetime import date, timedelta
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count, F, Sum
@@ -14,7 +15,7 @@ from django.utils import timezone
 
 from apps.analytics.models import AnalyticsSnapshot
 from apps.orders.models import Order, OrderItem
-from services import revenue_service
+from services import forecasting_service, revenue_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ CACHE_KEYS = [
     "analytics:revenue:monthly",
     "analytics:top_products",
     "analytics:customers",
+    "analytics:forecast",
 ]
 
 
@@ -126,11 +128,11 @@ def build_snapshots():
     """Recompute all KPI snapshots and invalidate the analytics cache."""
     today = timezone.now().date()
 
+    daily = revenue_service.daily_revenue()
+
     with transaction.atomic():
         counts = {
-            "revenue_daily": _sync_revenue(
-                AnalyticsSnapshot.Type.REVENUE_DAILY, revenue_service.daily_revenue()
-            ),
+            "revenue_daily": _sync_revenue(AnalyticsSnapshot.Type.REVENUE_DAILY, daily),
             "revenue_weekly": _sync_revenue(
                 AnalyticsSnapshot.Type.REVENUE_WEEKLY, revenue_service.weekly_revenue()
             ),
@@ -140,6 +142,17 @@ def build_snapshots():
         }
         _upsert(AnalyticsSnapshot.Type.TOP_PRODUCTS, today, today, top_products())
         _upsert(AnalyticsSnapshot.Type.CUSTOMERS, today, today, customer_breakdown())
+
+        horizon = settings.FORECAST_HORIZON_DAYS
+        forecast = forecasting_service.build_forecast(
+            daily, horizon, settings.ANOMALY_Z_THRESHOLD
+        )
+        _upsert(
+            AnalyticsSnapshot.Type.FORECAST,
+            today,
+            today + timedelta(days=horizon),
+            forecast,
+        )
 
     cache.delete_many(CACHE_KEYS)
     logger.info("Analytics snapshots rebuilt: %s", counts)
@@ -190,4 +203,16 @@ def get_customers():
         {"total_customers": 0, "new": 0, "returning": 0, "average_ltv": 0.0, "total_revenue": 0.0},
     )
     cache.set("analytics:customers", data, CACHE_TTL)
+    return data
+
+
+def get_forecast():
+    cached = cache.get("analytics:forecast")
+    if cached is not None:
+        return cached
+    data = _latest_metrics(
+        AnalyticsSnapshot.Type.FORECAST,
+        {"forecast": [], "anomalies": [], "model": None},
+    )
+    cache.set("analytics:forecast", data, CACHE_TTL)
     return data
