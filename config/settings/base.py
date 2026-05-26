@@ -39,6 +39,7 @@ LOCAL_APPS = [
     "apps.products",
     "apps.orders",
     "apps.ingestion",
+    "apps.analytics",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -144,6 +145,13 @@ SPECTACULAR_SETTINGS = {
 
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -157,6 +165,10 @@ CELERY_BEAT_SCHEDULE = {
     "nightly-import": {
         "task": "tasks.nightly_import.run_nightly_import",
         "schedule": crontab(hour=2, minute=0),
+    },
+    "analytics-snapshot": {
+        "task": "tasks.analytics_snapshot.run_analytics_snapshot",
+        "schedule": crontab(hour=3, minute=0),
     },
 }
 
