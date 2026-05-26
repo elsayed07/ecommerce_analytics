@@ -8,6 +8,7 @@ import logging
 from datetime import date
 
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Count, F, Sum
 from django.utils import timezone
 
@@ -39,24 +40,30 @@ def _completed_orders():
     return Order.objects.filter(status=Order.Status.COMPLETED)
 
 
+def _format_product_rows(rows):
+    formatted = []
+    for row in rows:
+        formatted.append(
+            {
+                "sku": row["product__sku"],
+                "name": row["product__name"],
+                "revenue": float(round(row["revenue"], 2)),
+                "quantity": int(row["quantity"]),
+            }
+        )
+    return formatted
+
+
 def top_products(limit=TOP_N):
-    rows = list(
+    base = (
         OrderItem.objects.filter(order__status=Order.Status.COMPLETED)
         .values("product__sku", "product__name")
-        .annotate(
-            revenue=Sum(F("quantity") * F("unit_price")),
-            quantity=Sum("quantity"),
-        )
+        .annotate(revenue=Sum(F("quantity") * F("unit_price")), quantity=Sum("quantity"))
     )
-    for row in rows:
-        row["sku"] = row.pop("product__sku")
-        row["name"] = row.pop("product__name")
-        row["revenue"] = float(round(row["revenue"], 2))
-        row["quantity"] = int(row["quantity"])
-
-    by_revenue = sorted(rows, key=lambda r: r["revenue"], reverse=True)[:limit]
-    by_quantity = sorted(rows, key=lambda r: r["quantity"], reverse=True)[:limit]
-    return {"by_revenue": by_revenue, "by_quantity": by_quantity}
+    return {
+        "by_revenue": _format_product_rows(base.order_by("-revenue")[:limit]),
+        "by_quantity": _format_product_rows(base.order_by("-quantity")[:limit]),
+    }
 
 
 def customer_breakdown():
@@ -80,48 +87,59 @@ def customer_breakdown():
 
 
 def _upsert(snapshot_type, period_start, period_end, metrics):
-    AnalyticsSnapshot.objects.update_or_create(
-        snapshot_type=snapshot_type,
-        period_start=period_start,
-        period_end=period_end,
-        defaults={"metrics": metrics},
-    )
+    """Create/update a snapshot, restoring a previously soft-deleted period if present."""
+    obj = AnalyticsSnapshot.all_objects.filter(
+        snapshot_type=snapshot_type, period_start=period_start, period_end=period_end
+    ).first()
+    if obj is not None:
+        obj.metrics = metrics
+        obj.is_deleted = False
+        obj.save()
+    else:
+        obj = AnalyticsSnapshot.objects.create(
+            snapshot_type=snapshot_type,
+            period_start=period_start,
+            period_end=period_end,
+            metrics=metrics,
+        )
+    return obj
+
+
+def _sync_revenue(snapshot_type, items):
+    """Upsert the fresh period set and drop periods that no longer exist in source data."""
+    fresh_pks = []
+    for item in items:
+        obj = _upsert(
+            snapshot_type,
+            date.fromisoformat(item["period_start"]),
+            date.fromisoformat(item["period_end"]),
+            item,
+        )
+        fresh_pks.append(obj.pk)
+    AnalyticsSnapshot.objects.filter(snapshot_type=snapshot_type).exclude(
+        pk__in=fresh_pks
+    ).delete()
+    return len(fresh_pks)
 
 
 def build_snapshots():
     """Recompute all KPI snapshots and invalidate the analytics cache."""
     today = timezone.now().date()
-    counts = {"revenue_daily": 0, "revenue_weekly": 0, "revenue_monthly": 0}
 
-    for item in revenue_service.daily_revenue():
-        _upsert(
-            AnalyticsSnapshot.Type.REVENUE_DAILY,
-            date.fromisoformat(item["period_start"]),
-            date.fromisoformat(item["period_end"]),
-            item,
-        )
-        counts["revenue_daily"] += 1
-
-    for item in revenue_service.weekly_revenue():
-        _upsert(
-            AnalyticsSnapshot.Type.REVENUE_WEEKLY,
-            date.fromisoformat(item["period_start"]),
-            date.fromisoformat(item["period_end"]),
-            item,
-        )
-        counts["revenue_weekly"] += 1
-
-    for item in revenue_service.monthly_revenue():
-        _upsert(
-            AnalyticsSnapshot.Type.REVENUE_MONTHLY,
-            date.fromisoformat(item["period_start"]),
-            date.fromisoformat(item["period_end"]),
-            item,
-        )
-        counts["revenue_monthly"] += 1
-
-    _upsert(AnalyticsSnapshot.Type.TOP_PRODUCTS, today, today, top_products())
-    _upsert(AnalyticsSnapshot.Type.CUSTOMERS, today, today, customer_breakdown())
+    with transaction.atomic():
+        counts = {
+            "revenue_daily": _sync_revenue(
+                AnalyticsSnapshot.Type.REVENUE_DAILY, revenue_service.daily_revenue()
+            ),
+            "revenue_weekly": _sync_revenue(
+                AnalyticsSnapshot.Type.REVENUE_WEEKLY, revenue_service.weekly_revenue()
+            ),
+            "revenue_monthly": _sync_revenue(
+                AnalyticsSnapshot.Type.REVENUE_MONTHLY, revenue_service.monthly_revenue()
+            ),
+        }
+        _upsert(AnalyticsSnapshot.Type.TOP_PRODUCTS, today, today, top_products())
+        _upsert(AnalyticsSnapshot.Type.CUSTOMERS, today, today, customer_breakdown())
 
     cache.delete_many(CACHE_KEYS)
     logger.info("Analytics snapshots rebuilt: %s", counts)

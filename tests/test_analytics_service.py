@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 from django.core.cache import cache
+from django.core.management import call_command
 
 from apps.analytics.models import AnalyticsSnapshot
 from services import analytics_service, revenue_service
@@ -40,6 +41,15 @@ def test_daily_aov_and_rolling_average():
     assert daily[0]["aov"] == 75.0
     assert daily[0]["rolling_7"] == 150.0
     assert daily[0]["rolling_30"] == 150.0
+
+
+def test_daily_revenue_includes_growth_pct():
+    OrderFactory(status="completed", total="100.00", order_date=_dt(2025, 1, 1))
+    OrderFactory(status="completed", total="150.00", order_date=_dt(2025, 1, 2))
+
+    daily = revenue_service.daily_revenue()
+    assert daily[0]["growth_pct"] is None
+    assert daily[1]["growth_pct"] == 50.0
 
 
 def test_monthly_growth_percentage():
@@ -98,3 +108,41 @@ def test_build_snapshots_is_idempotent_and_clears_cache():
     cache.set("analytics:revenue:daily", "STALE", 60)
     analytics_service.build_snapshots()
     assert cache.get("analytics:revenue:daily") is None
+
+
+def test_rebuild_removes_stale_revenue_periods():
+    order = OrderFactory(status="completed", total="100.00", order_date=_dt(2025, 1, 1))
+    analytics_service.build_snapshots()
+    assert AnalyticsSnapshot.objects.filter(snapshot_type="revenue_daily").count() == 1
+
+    order.status = "cancelled"
+    order.save()
+    analytics_service.build_snapshots()
+    assert AnalyticsSnapshot.objects.filter(snapshot_type="revenue_daily").count() == 0
+    assert analytics_service.get_revenue("daily") == []
+
+
+def test_reappearing_period_is_restored_after_being_stale():
+    order = OrderFactory(status="completed", total="100.00", order_date=_dt(2025, 1, 1))
+    analytics_service.build_snapshots()
+    order.status = "cancelled"
+    order.save()
+    analytics_service.build_snapshots()
+    order.status = "completed"
+    order.save()
+    analytics_service.build_snapshots()
+
+    assert AnalyticsSnapshot.objects.filter(snapshot_type="revenue_daily").count() == 1
+    assert analytics_service.get_revenue("daily")[0]["revenue"] == 100.0
+
+
+def test_snapshot_task_and_command_build_snapshots():
+    from tasks.analytics_snapshot import run_analytics_snapshot
+
+    OrderFactory(status="completed", total="10.00", order_date=_dt(2025, 1, 1))
+    result = run_analytics_snapshot.delay()
+    assert result.get()["revenue_daily"] == 1
+
+    OrderFactory(status="completed", total="20.00", order_date=_dt(2025, 1, 2))
+    call_command("build_snapshots")
+    assert AnalyticsSnapshot.objects.filter(snapshot_type="revenue_daily").count() == 2

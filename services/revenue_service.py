@@ -41,17 +41,24 @@ def _aov(revenue, orders):
 def daily_revenue():
     rows = _aggregate_by(TruncDate)
     series = []
+    previous = None
     for row in rows:
         day = row["period"]
+        revenue = row["revenue"]
+        growth = None
+        if previous is not None and previous > 0:
+            growth = float(round((revenue - previous) / previous * 100, 2))
         series.append(
             {
                 "period_start": day.isoformat(),
                 "period_end": day.isoformat(),
-                "revenue": float(round(row["revenue"], 2)),
+                "revenue": float(round(revenue, 2)),
                 "orders": row["orders"],
-                "aov": _aov(row["revenue"], row["orders"]),
+                "aov": _aov(revenue, row["orders"]),
+                "growth_pct": growth,
             }
         )
+        previous = revenue
 
     revenues = [row["revenue"] for row in rows]
     for i, item in enumerate(series):

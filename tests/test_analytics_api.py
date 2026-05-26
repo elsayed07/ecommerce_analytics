@@ -54,3 +54,9 @@ def test_revenue_is_empty_before_any_snapshot():
     res = auth_client(UserFactory()).get("/api/v1/analytics/revenue/")
     assert res.status_code == 200
     assert res.json()["data"]["series"] == []
+
+
+def test_invalid_period_returns_validation_error():
+    res = auth_client(UserFactory()).get("/api/v1/analytics/revenue/?period=banana")
+    assert res.status_code == 400
+    assert res.json()["error"]["code"] == "VALIDATION_ERROR"

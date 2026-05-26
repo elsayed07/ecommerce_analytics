@@ -1,12 +1,16 @@
 import plotly.graph_objects as go
+from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from services import analytics_service
+
+VALID_PERIODS = ("daily", "weekly", "monthly")
 
 
 class RevenueView(APIView):
@@ -15,6 +19,10 @@ class RevenueView(APIView):
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         period = request.query_params.get("period", "daily")
+        if period not in VALID_PERIODS:
+            raise ValidationError(
+                f"Invalid period '{period}'. Choose one of: {', '.join(VALID_PERIODS)}."
+            )
         return Response({"period": period, "series": analytics_service.get_revenue(period)})
 
 
@@ -34,8 +42,9 @@ class CustomersView(APIView):
         return Response(analytics_service.get_customers())
 
 
+@staff_member_required
 def dashboard(request):
-    """Server-side Plotly dashboard reading from analytics snapshots."""
+    """Server-side Plotly dashboard reading from analytics snapshots (staff only)."""
     revenue = analytics_service.get_revenue("daily")
     top = analytics_service.get_top_products()
     customers = analytics_service.get_customers()

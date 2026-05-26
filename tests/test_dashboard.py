@@ -5,12 +5,12 @@ from rest_framework.test import APIClient
 
 from services import analytics_service
 
-from .factories import OrderFactory, OrderItemFactory, ProductFactory
+from .factories import OrderFactory, OrderItemFactory, ProductFactory, UserFactory
 
 pytestmark = pytest.mark.django_db
 
 
-def test_dashboard_renders_plotly_charts():
+def _seed_and_build():
     product = ProductFactory(sku="P1")
     order = OrderFactory(
         status="completed",
@@ -20,7 +20,18 @@ def test_dashboard_renders_plotly_charts():
     OrderItemFactory(order=order, product=product, quantity=1, unit_price="100.00")
     analytics_service.build_snapshots()
 
+
+def test_dashboard_requires_authentication():
+    _seed_and_build()
     res = APIClient().get("/dashboard/")
+    assert res.status_code == 302  # redirected to admin login
+
+
+def test_dashboard_renders_plotly_for_staff():
+    _seed_and_build()
+    client = APIClient()
+    client.force_login(UserFactory(is_staff=True))
+
+    res = client.get("/dashboard/")
     assert res.status_code == 200
-    content = res.content.decode()
-    assert "plotly" in content.lower()
+    assert "plotly" in res.content.decode().lower()
