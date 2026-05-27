@@ -137,6 +137,21 @@ def test_reappearing_period_is_restored_after_being_stale():
     assert analytics_service.get_revenue("daily")[0]["revenue"] == 100.0
 
 
+def test_changed_horizon_leaves_single_active_forecast(settings):
+    OrderFactory(status="completed", total="100.00", order_date=_dt(2025, 1, 1))
+    OrderFactory(status="completed", total="120.00", order_date=_dt(2025, 1, 2))
+
+    settings.FORECAST_HORIZON_DAYS = 30
+    analytics_service.build_snapshots()
+    settings.FORECAST_HORIZON_DAYS = 14
+    analytics_service.build_snapshots()
+
+    assert AnalyticsSnapshot.objects.filter(snapshot_type="forecast").count() == 1
+    forecast = analytics_service.get_forecast()
+    assert forecast["horizon"] == 14
+    assert len(forecast["forecast"]) == 14
+
+
 def test_snapshot_task_and_command_build_snapshots():
     from tasks.analytics_snapshot import run_analytics_snapshot
 

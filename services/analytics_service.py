@@ -147,12 +147,17 @@ def build_snapshots():
         forecast = forecasting_service.build_forecast(
             daily, horizon, settings.ANOMALY_Z_THRESHOLD
         )
-        _upsert(
+        forecast_obj = _upsert(
             AnalyticsSnapshot.Type.FORECAST,
             today,
             today + timedelta(days=horizon),
             forecast,
         )
+        # A forecast is a single current projection, not history: drop prior
+        # forecast rows (their period_end shifts daily and with the horizon).
+        AnalyticsSnapshot.objects.filter(
+            snapshot_type=AnalyticsSnapshot.Type.FORECAST
+        ).exclude(pk=forecast_obj.pk).delete()
 
     cache.delete_many(CACHE_KEYS)
     logger.info("Analytics snapshots rebuilt: %s", counts)

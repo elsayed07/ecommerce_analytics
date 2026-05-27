@@ -41,7 +41,9 @@ App runs at http://localhost:8000 · admin at http://localhost:8000/admin/.
 
 See `.env.example`. Key vars: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`,
 `POSTGRES_DB/USER/PASSWORD/HOST/PORT`, `REDIS_URL`,
-`DJANGO_SETTINGS_MODULE` (`config.settings.development` or `.production`).
+`DJANGO_SETTINGS_MODULE` (`config.settings.development` or `.production`),
+`IMPORT_INBOX_DIR`, `FORECAST_HORIZON_DAYS` (days projected ahead, default 30),
+`ANOMALY_Z_THRESHOLD` (z-score cutoff for daily-revenue anomalies, default 3.0).
 
 ## Authentication
 
