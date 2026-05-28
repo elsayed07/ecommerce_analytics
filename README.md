@@ -37,6 +37,18 @@ docker-compose exec web python manage.py createsuperuser
 
 App runs at http://localhost:8000 · admin at http://localhost:8000/admin/.
 
+## Demo data
+
+Populate a realistic dataset and precompute the analytics the dashboard reads.
+The `--seed` makes generation reproducible; re-running with the same seed is idempotent.
+
+```bash
+docker-compose exec web python manage.py generate_demo_data --orders=2000 --seed=42
+docker-compose exec web python manage.py build_snapshots
+```
+
+The dashboard is then at http://localhost:8000/dashboard/ (requires a staff login).
+
 ## Environment variables
 
 See `.env.example`. Key vars: `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`,
