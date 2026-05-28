@@ -295,8 +295,6 @@ Released under the [MIT License](LICENSE).
 
 ## Author
 
-**Sayed** — backend / data engineering portfolio project (domain inspired by
-[Lilymade.it](https://lilymade.it), handmade crochet bags).
+— backend / data engineering portfolio project (domain inspired by
+[Lilymade.it](https://lilymade.it), handmade crochet bags.
 
-- GitHub: [@elsayed07](https://github.com/elsayed07)
-- Email: elsayedelsayad41@gmail.com
