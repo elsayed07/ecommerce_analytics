@@ -17,6 +17,9 @@ SECRET_KEY = env("SECRET_KEY", default="insecure-dev-key-change-me")
 DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
+# Optional link surfaced on the landing page; omitted when empty.
+GITHUB_REPO_URL = env("GITHUB_REPO_URL", default="")
+
 DJANGO_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

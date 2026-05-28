@@ -4,8 +4,17 @@ import redis
 from django.conf import settings
 from django.db import connection
 from django.http import JsonResponse
+from django.shortcuts import redirect, render
 
 logger = logging.getLogger(__name__)
+
+
+def landing(request):
+    """Portfolio landing page; authenticated users go straight to the dashboard."""
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+    github_url = getattr(settings, "GITHUB_REPO_URL", "") or None
+    return render(request, "common/landing.html", {"github_url": github_url})
 
 
 def _check_database():

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>E-Commerce Analytics Dashboard</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #fafafa; margin: 0;
+           display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+    main { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px;
+           padding: 2.5rem; max-width: 640px; margin: 1.5rem; }
+    h1 { margin: 0 0 0.5rem; }
+    .lead { color: #444; line-height: 1.55; }
+    ul { list-style: none; padding: 0; margin: 1.5rem 0 0; }
+    li { margin: 0.4rem 0; }
+    a { color: #1a5fb4; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .foot { color: #888; font-size: 0.9rem; margin-top: 1.5rem; }
+    code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>E-Commerce Analytics Dashboard</h1>
+    <p class="lead">
+      A Django/DRF platform that ingests multi-currency orders through a validated ETL
+      pipeline, precomputes revenue and customer KPIs into analytics snapshots, and
+      forecasts sales with linear-regression trend projection and z-score anomaly
+      detection &mdash; visualised on a server-rendered Plotly dashboard.
+    </p>
+    <ul>
+      <li><a href="{% url 'dashboard' %}">Analytics dashboard</a></li>
+      <li><a href="{% url 'swagger-ui' %}">API docs &mdash; Swagger</a></li>
+      <li><a href="{% url 'redoc' %}">API docs &mdash; ReDoc</a></li>
+      <li><a href="{% url 'health' %}">Health check</a></li>
+      <li><a href="{% url 'admin:index' %}">Admin</a></li>
+      {% if github_url %}<li><a href="{{ github_url }}">Source code on GitHub</a></li>{% endif %}
+    </ul>
+    <p class="foot">All API resources are served under <code>/api/v1/</code>.</p>
+  </main>
+</body>
+</html>

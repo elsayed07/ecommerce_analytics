@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.urls import include, path
-from django.views.generic import RedirectView
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -8,10 +7,10 @@ from drf_spectacular.views import (
 )
 
 from apps.analytics.views import dashboard
-from apps.common.views import health
+from apps.common.views import health, landing
 
 urlpatterns = [
-    path("", RedirectView.as_view(pattern_name="dashboard", permanent=False)),
+    path("", landing, name="landing"),
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),
     path("dashboard/", dashboard, name="dashboard"),
