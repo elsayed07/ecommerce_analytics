@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Analytics Dashboard</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 2rem; background: #fafafa; }
+    @media (max-width: 640px) { body { margin: 1rem; } }
     h1 { margin-bottom: 0.25rem; }
     .summary { color: #444; margin-bottom: 1.5rem; }
     .chart { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
+    .chart .plotly-graph-div { width: 100% !important; }
   </style>
 </head>
 <body>

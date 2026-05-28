@@ -115,10 +115,11 @@ def dashboard(request):
     )
     forecast_fig.update_layout(title="Revenue forecast (EUR)")
 
+    responsive = {"responsive": True}
     charts = [
-        revenue_fig.to_html(full_html=False, include_plotlyjs="cdn"),
-        forecast_fig.to_html(full_html=False, include_plotlyjs=False),
-        products_fig.to_html(full_html=False, include_plotlyjs=False),
-        customers_fig.to_html(full_html=False, include_plotlyjs=False),
+        revenue_fig.to_html(full_html=False, include_plotlyjs="cdn", config=responsive),
+        forecast_fig.to_html(full_html=False, include_plotlyjs=False, config=responsive),
+        products_fig.to_html(full_html=False, include_plotlyjs=False, config=responsive),
+        customers_fig.to_html(full_html=False, include_plotlyjs=False, config=responsive),
     ]
     return render(request, "analytics/dashboard.html", {"charts": charts, "customers": customers})
