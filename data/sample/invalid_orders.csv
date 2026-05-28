@@ -1,0 +1,14 @@
+order_ref,order_date,status,currency,customer_email,customer_name,product_sku,quantity,unit_price
+BAD-1,2025-11-01T10:00:00,completed,EUR,,Missing Email,BAG-001,1,65.00
+BAD-2,not-a-real-date,completed,EUR,b@example.com,Bad Date,BAG-001,1,65.00
+BAD-3,2099-01-01T10:00:00,completed,EUR,c@example.com,Future Date,BAG-001,1,65.00
+BAD-4,2025-11-02T10:00:00,completed,EUR,d@example.com,Negative Price,BAG-001,1,-65.00
+BAD-5,2025-11-03T10:00:00,completed,EUR,e@example.com,Negative Qty,BAG-001,-2,65.00
+BAD-6,2025-11-04T10:00:00,completed,EUR,f@example.com,Dup Line,BAG-001,1,65.00
+BAD-6,2025-11-04T10:00:00,completed,EUR,f@example.com,Dup Line,BAG-001,2,65.00
+BAD-7,2025-11-05T10:00:00,completed,EUR,g@example.com,Malformed SKU,BAD SKU!,1,65.00
+BAD-8,2025-11-06T10:00:00,completed,EUR,h@example.com,Unknown SKU,NOPE-999,1,65.00
+BAD-9,2025-11-07T10:00:00,completed,JPY,i@example.com,Bad Currency,BAG-001,1,65.00
+BAD-10,2025-11-08T10:00:00,shipped,EUR,j@example.com,Bad Status,BAG-001,1,65.00
+BAD-11,2025-11-09T10:00:00,completed,EUR,k@example.com,Header One,BAG-001,1,65.00
+BAD-11,2025-11-09T10:00:00,completed,EUR,other@example.com,Header Two,BAG-002,1,72.00
