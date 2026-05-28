@@ -71,3 +71,25 @@ def test_management_command_rejects_non_positive_orders():
 
     with pytest.raises(CommandError):
         call_command("generate_demo_data", "--orders=0")
+
+
+def test_regeneration_restores_soft_deleted_rows():
+    demo_data_service.generate_demo_data(orders=120, seed=42)
+
+    category = Category.objects.first()
+    product = Product.objects.first()
+    customer = Customer.objects.first()
+    order = Order.objects.first()
+    for obj in (category, product, customer, order):
+        obj.delete()  # soft delete
+
+    # Re-running the same seed must not raise a uniqueness error...
+    demo_data_service.generate_demo_data(orders=120, seed=42)
+
+    # ...and the reused rows are restored rather than duplicated.
+    assert Category.all_objects.get(pk=category.pk).is_deleted is False
+    assert Product.all_objects.get(pk=product.pk).is_deleted is False
+    assert Customer.all_objects.get(pk=customer.pk).is_deleted is False
+    assert Order.all_objects.get(pk=order.pk).is_deleted is False
+    assert Category.all_objects.filter(slug=category.slug).count() == 1
+    assert Product.all_objects.filter(sku=product.sku).count() == 1

@@ -212,3 +212,90 @@ def test_management_command_rejects_bad_extension(tmp_path):
     path.write_text("nope")
     with pytest.raises(CommandError):
         call_command("import_orders", file=str(path))
+
+
+def test_reimport_with_fewer_lines_soft_deletes_stale_items(tmp_path):
+    ProductFactory(sku="SKU-A")
+    ProductFactory(sku="SKU-B")
+    _run_csv(
+        tmp_path,
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-A,1,10.00\n"
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-B,1,20.00\n",
+    )
+    assert OrderItem.objects.filter(order__external_ref="ORD-1").count() == 2
+
+    # Re-import the same order with SKU-B dropped.
+    _run_csv(
+        tmp_path,
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-A,1,10.00\n",
+    )
+
+    active = OrderItem.objects.filter(order__external_ref="ORD-1")
+    assert active.count() == 1
+    assert active.first().product.sku == "SKU-A"
+
+    # The dropped line survives only as a soft-deleted row (not hard-deleted).
+    stale = OrderItem.all_objects.get(order__external_ref="ORD-1", product__sku="SKU-B")
+    assert stale.is_deleted is True
+
+
+def test_reimport_restores_soft_deleted_customer(tmp_path):
+    ProductFactory(sku="SKU-1")
+    body = "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,1,10.00\n"
+    _run_csv(tmp_path, body)
+
+    customer = Customer.objects.get(email="a@example.com")
+    customer.delete()  # soft delete
+    assert not Customer.objects.filter(email="a@example.com").exists()
+
+    _run_csv(tmp_path, body)
+
+    restored = Customer.all_objects.filter(email="a@example.com")
+    assert restored.count() == 1  # reused, not duplicated
+    assert restored.first().pk == customer.pk
+    assert restored.first().is_deleted is False
+
+
+def test_reimport_restores_soft_deleted_order(tmp_path):
+    ProductFactory(sku="SKU-1")
+    body = "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,1,10.00\n"
+    _run_csv(tmp_path, body)
+
+    order = Order.objects.get(external_ref="ORD-1")
+    order.delete()  # soft delete
+    assert not Order.objects.filter(external_ref="ORD-1").exists()
+
+    _run_csv(tmp_path, body)
+
+    restored = Order.all_objects.filter(external_ref="ORD-1")
+    assert restored.count() == 1  # reused, not duplicated
+    assert restored.first().pk == order.pk
+    assert restored.first().is_deleted is False
+
+
+def test_reimport_restores_soft_deleted_order_item(tmp_path):
+    ProductFactory(sku="SKU-1")
+    _run_csv(
+        tmp_path,
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,1,10.00\n",
+    )
+
+    item = OrderItem.objects.get(order__external_ref="ORD-1", product__sku="SKU-1")
+    item.delete()  # soft delete
+    assert not OrderItem.objects.filter(pk=item.pk).exists()
+
+    # Re-import the same line with an updated quantity.
+    _run_csv(
+        tmp_path,
+        "ORD-1,2025-01-15T10:00:00,completed,EUR,a@example.com,Alice,SKU-1,3,10.00\n",
+    )
+
+    restored = OrderItem.all_objects.get(pk=item.pk)
+    assert restored.is_deleted is False
+    assert restored.quantity == 3
+    assert (
+        OrderItem.all_objects.filter(
+            order__external_ref="ORD-1", product__sku="SKU-1"
+        ).count()
+        == 1
+    )

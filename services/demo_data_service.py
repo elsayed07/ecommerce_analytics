@@ -13,6 +13,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.orders.models import Customer, Order, OrderItem
 from apps.products.models import Category, Inventory, Product
@@ -157,28 +158,54 @@ def _build_dataset(orders, seed):
     }
 
 
+def _get_or_restore(manager, defaults, **lookup):
+    """get_or_create over all_objects, restoring a soft-deleted match so unique
+    fields (slug/sku/product) are reused rather than colliding."""
+    obj, created = manager.get_or_create(defaults=defaults, **lookup)
+    if not created and obj.is_deleted:
+        obj.is_deleted = False
+        obj.save(update_fields=["is_deleted", "updated_at"])
+    return obj
+
+
+def _restore_soft_deleted(manager, objs, now):
+    """Bulk-restore any soft-deleted rows among reused objects."""
+    deleted = [o for o in objs if o.is_deleted]
+    if not deleted:
+        return
+    for obj in deleted:
+        obj.is_deleted = False
+        obj.updated_at = now
+    manager.bulk_update(deleted, ["is_deleted", "updated_at"])
+
+
 def _persist(data):
     """Bulk-load a dataset idempotently and return per-model counts."""
+    now = timezone.now()
+
     category_map = {}
     for row in data["categories"]:
-        category_map[row["slug"]] = Category.objects.get_or_create(
-            slug=row["slug"], defaults={"name": row["name"]}
-        )[0]
+        category_map[row["slug"]] = _get_or_restore(
+            Category.all_objects, {"name": row["name"]}, slug=row["slug"]
+        )
 
     product_map = {}
     for row in data["products"]:
-        product_map[row["sku"]] = Product.objects.get_or_create(
-            sku=row["sku"],
-            defaults={
+        product_map[row["sku"]] = _get_or_restore(
+            Product.all_objects,
+            {
                 "name": row["name"],
                 "category": category_map[row["category_slug"]],
                 "price": Decimal(row["price"]),
             },
-        )[0]
+            sku=row["sku"],
+        )
 
     for row in data["inventory"]:
-        Inventory.objects.get_or_create(
-            product=product_map[row["sku"]], defaults={"quantity": row["quantity"]}
+        _get_or_restore(
+            Inventory.all_objects,
+            {"quantity": row["quantity"]},
+            product=product_map[row["sku"]],
         )
 
     names_by_email = {c["email"]: c["name"] for c in data["customers"]}
@@ -191,6 +218,7 @@ def _persist(data):
         ignore_conflicts=True,
     )
     customer_map = {c.email: c for c in Customer.all_objects.filter(email__in=names_by_email)}
+    _restore_soft_deleted(Customer.all_objects, customer_map.values(), now)
 
     order_objs = [
         Order(
@@ -208,6 +236,7 @@ def _persist(data):
     Order.objects.bulk_create(order_objs, batch_size=BATCH_SIZE, ignore_conflicts=True)
     refs = [row["external_ref"] for row in data["orders"]]
     order_map = {o.external_ref: o for o in Order.all_objects.filter(external_ref__in=refs)}
+    _restore_soft_deleted(Order.all_objects, order_map.values(), now)
 
     item_objs = [
         OrderItem(

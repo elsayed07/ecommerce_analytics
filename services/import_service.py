@@ -48,6 +48,7 @@ ORDER_FIELDS = [
     "source_currency",
     "total",
     "source_total",
+    "is_deleted",
     "updated_at",
 ]
 
@@ -157,7 +158,8 @@ def _upsert_customers(records, now):
     for record in records:
         names[record["customer_email"]] = record["customer_name"]
 
-    existing = {c.email: c for c in Customer.objects.filter(email__in=names)}
+    # all_objects so a soft-deleted email is reused/restored, not duplicated.
+    existing = {c.email: c for c in Customer.all_objects.filter(email__in=names)}
     to_create = [
         Customer(email=email, name=name)
         for email, name in names.items()
@@ -167,14 +169,20 @@ def _upsert_customers(records, now):
 
     to_update = []
     for customer in existing.values():
+        changed = False
         if customer.name != names[customer.email]:
             customer.name = names[customer.email]
+            changed = True
+        if customer.is_deleted:
+            customer.is_deleted = False
+            changed = True
+        if changed:
             customer.updated_at = now
             to_update.append(customer)
     if to_update:
-        Customer.objects.bulk_update(to_update, ["name", "updated_at"])
+        Customer.all_objects.bulk_update(to_update, ["name", "is_deleted", "updated_at"])
 
-    return {c.email: c for c in Customer.objects.filter(email__in=names)}
+    return {c.email: c for c in Customer.all_objects.filter(email__in=names)}
 
 
 def _upsert_orders(order_groups, customers, now):
@@ -197,7 +205,8 @@ def _upsert_orders(order_groups, customers, now):
             ).quantize(CENTS),
         }
 
-    existing = {o.external_ref: o for o in Order.objects.filter(external_ref__in=order_groups)}
+    # all_objects so a soft-deleted external_ref is reused/restored, not duplicated.
+    existing = {o.external_ref: o for o in Order.all_objects.filter(external_ref__in=order_groups)}
     to_create = [
         Order(external_ref=ref, **header)
         for ref, header in headers.items()
@@ -209,12 +218,13 @@ def _upsert_orders(order_groups, customers, now):
     for ref, order in existing.items():
         for field, value in headers[ref].items():
             setattr(order, field, value)
+        order.is_deleted = False
         order.updated_at = now
         to_update.append(order)
     if to_update:
-        Order.objects.bulk_update(to_update, ORDER_FIELDS)
+        Order.all_objects.bulk_update(to_update, ORDER_FIELDS)
 
-    return {o.external_ref: o for o in Order.objects.filter(external_ref__in=order_groups)}
+    return {o.external_ref: o for o in Order.all_objects.filter(external_ref__in=order_groups)}
 
 
 def _upsert_order_items(order_groups, orders, now):
@@ -224,9 +234,11 @@ def _upsert_order_items(order_groups, orders, now):
         for line in lines:
             desired[(order.id, line["product"].id)] = line
 
+    # all_objects so soft-deleted lines are restored (not re-created) and stale
+    # lines for re-imported orders can be soft-deleted.
     existing = {
         (item.order_id, item.product_id): item
-        for item in OrderItem.objects.filter(order__in=orders.values())
+        for item in OrderItem.all_objects.filter(order__in=orders.values())
     }
 
     to_create, to_update = [], []
@@ -244,12 +256,27 @@ def _upsert_order_items(order_groups, orders, now):
         else:
             item.quantity = line["quantity"]
             item.unit_price = line["unit_price_eur"]
+            item.is_deleted = False
             item.updated_at = now
             to_update.append(item)
 
+    # Lines that vanished from a re-imported order: soft-delete the leftovers.
+    stale = [
+        item
+        for key, item in existing.items()
+        if key not in desired and not item.is_deleted
+    ]
+    for item in stale:
+        item.is_deleted = True
+        item.updated_at = now
+
     OrderItem.objects.bulk_create(to_create)
     if to_update:
-        OrderItem.objects.bulk_update(to_update, ["quantity", "unit_price", "updated_at"])
+        OrderItem.all_objects.bulk_update(
+            to_update, ["quantity", "unit_price", "is_deleted", "updated_at"]
+        )
+    if stale:
+        OrderItem.all_objects.bulk_update(stale, ["is_deleted", "updated_at"])
 
 
 def _persist(records):
