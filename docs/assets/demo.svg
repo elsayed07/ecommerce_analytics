@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="Demo recording placeholder">
-  <rect width="1200" height="675" fill="#0d1117"/>
-  <rect x="40" y="40" width="1120" height="595" rx="16" fill="#161b22" stroke="#30363d"/>
-  <circle cx="600" cy="320" r="80" fill="#1a5fb4"/>
-  <polygon points="575,280 575,360 645,320" fill="#ffffff"/>
-  <text x="600" y="460" text-anchor="middle" font-family="system-ui, sans-serif" font-size="34" font-weight="700" fill="#e6edf3">Demo GIF</text>
-  <text x="600" y="505" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" fill="#8b949e">PLACEHOLDER — replace docs/assets/demo.gif with a short screen recording</text>
-</svg>

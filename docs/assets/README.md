@@ -1,8 +1,8 @@
 # Screenshots & demo assets
 
-The main README references the images in this folder. The committed `*.svg` files are
-**placeholders** so the README renders cleanly before real captures exist. Replace them
-with real screenshots when ready.
+The main README references the images in this folder (`screenshot-*.png`, `demo.gif`).
+They were captured against the seeded demo dataset. Use the steps below to regenerate them
+after UI changes.
 
 ## How to capture
 
@@ -13,8 +13,8 @@ with real screenshots when ready.
    docker compose exec web python manage.py build_snapshots
    docker compose exec web python manage.py createsuperuser   # for dashboard access
    ```
-2. Capture each screen below at ~1280px wide and save it here, then update the image
-   path in the root `README.md` (swap the `.svg` placeholder for your `.png`/`.gif`).
+2. Capture each screen below at ~1280px wide and overwrite the matching file here
+   (the root `README.md` already points at these filenames).
 
 | Screen | URL | Suggested file |
 |---|---|---|

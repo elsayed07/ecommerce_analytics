@@ -45,24 +45,22 @@ The codebase follows a strict **service-layer architecture**: all business logic
 
 ## Screenshots
 
-> The images below are **placeholders**. See
-> [`docs/assets/README.md`](docs/assets/README.md) for how to capture and drop in the real
-> screenshots.
-
 | Landing page | Analytics dashboard |
 |---|---|
-| ![Landing page](docs/assets/screenshot-landing.svg) | ![Analytics dashboard](docs/assets/screenshot-dashboard.svg) |
+| ![Landing page](docs/assets/screenshot-landing.png) | ![Analytics dashboard](docs/assets/screenshot-dashboard.png) |
 
 | API docs (Swagger) |
 |---|
-| ![Swagger UI](docs/assets/screenshot-swagger.svg) |
+| ![Swagger UI](docs/assets/screenshot-swagger.png) |
+
+_Captured against the demo dataset. See [`docs/assets/README.md`](docs/assets/README.md) to
+regenerate them._
 
 ## Demo
 
-> Placeholder — replace `docs/assets/demo.gif` with a short walkthrough recording
-> (login → dashboard → an API call in Swagger).
+A quick walkthrough — landing page → analytics dashboard → API docs:
 
-![Demo](docs/assets/demo.svg)
+![Demo](docs/assets/demo.gif)
 
 ## Features
 
